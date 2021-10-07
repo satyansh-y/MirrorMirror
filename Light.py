@@ -1,5 +1,5 @@
-import os
 import sys
+import pickle
 import os.path
 import os
 import requests
@@ -15,10 +15,11 @@ import tornado.web
 import termios
 import tty
 import pigpio
-import time
 from _thread import start_new_thread
-import socket
-import urllib.parse
+
+
+
+
 
 RED_PIN   = 13
 GREEN_PIN = 19
@@ -28,8 +29,6 @@ red=pigpio.pi()
 green=pigpio.pi()
 blue=pigpio.pi()
 #code to set individual pin brightness- change brightness value
-
-
 
 
 #Tornado Folder Paths
@@ -49,12 +48,40 @@ class MainHandler(tornado.web.RequestHandler):
 
         
 class WSHandler(tornado.websocket.WebSocketHandler):
+    #calender
+  today_beginning = datetime.combine(date.today(), time())
+  today_end = datetime.combine(date.today(), time.max)
+  todo = {}
+  #def main():
+  message= ''
+  service = get_calendar_service()
+    # Call the Calendar API
+  now = today_beginning.isoformat() + 'Z' # 'Z' indicates UTC time
+  end = today_end.isoformat() + 'Z'
+  events_result = service.events().list(
+      calendarId = 'primary', timeMin = now,
+      timeMax = end, singleEvents = True,
+      orderBy = 'startTime').execute()
+  events = events_result.get('items', [])
+
+  if not events:
+      message= message + 'You do not have any events scheduled for today'
+  for event in events:
+      start = event['start'].get('dateTime', event['start'].get('date'))
+        
+      todo.update({event['summary'] : start[11:19]})
+
+  if len(todo) != 0:
+      message= message+ 'You have several events scheduled for today:'
+      for key in todo:
+          message= message + '\n'+  key + ' at ' + todo.get(key)
+  print(message)
   def open(self):
     print('[WS] Connection was opened.')
 
   def write_message(self, message):
     self.write_message("it is working")
-  write_message(WSHandler, "hello")
+  
   def on_message(self, message):
     print('[WS] Incoming message:', message)
     if message == "ON":
@@ -115,6 +142,8 @@ application = tornado.web.Application([
   (r'/', MainHandler),
   (r'/ws', WSHandler),
   ], **settings)
+
+  
 
 
 if __name__ == "__main__":
